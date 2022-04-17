@@ -1,0 +1,305 @@
+---
+title: "Understanding NYC School Perceptions"
+author: "Abe Ceasar Perez"
+date: "March 27, 2022"
+output: html_document
+---
+
+### NYC School Perceptions
+
+This project aims to understand the perception of students, teachers, and parents on the NYC Schools. We'll be working as a researcher to determine whether there is any correlation between the perceptions and demographics/academic success metrics and whether the respondents have similar perceptions on the school quality.
+
+In addition to the objectives above, we'll be applying the following concepts in this project:
+- String Manipulation
+- Correlations
+- Data Reshaping
+
+### Initial Findings
+
+Based on the results of this project, demographics tend to decrease the overall perception of each respondents whereas academic success metrics tend to increase the overall perception of the mentioned school. Parents, in particular, tend to have higher perception scores/positive feedback which is in contrary to the students having lower perception scores.
+
+To understand how the results were obtained, the process is outlined below:
+
+### Loading the packages
+
+Here are the packages used for this project and their usages:
+
+- readr: for importing the datasets
+- tidyr: for cleaning the datasets 
+- ggplot2: for visualizing the data
+- dplyr: for manipulating the data and other additional functions
+- purrr: for mapping functions 
+- tibble: for creation of tibbles
+- readxl: for loading excel-related datasets
+
+```{r load_packages, echo=TRUE, warning=FALSE}
+
+# reads the packages without loading additional messages
+suppressPackageStartupMessages(library(readr))
+suppressPackageStartupMessages(library(tidyr))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(purrr))
+suppressPackageStartupMessages(library(tibble))
+suppressPackageStartupMessages(library(readxl))
+
+```
+
+### Loading the datasets
+
+The initial dataset was taken from <https://data.world/dataquest/nyc-schools-data/workspace/file?filename=combined.csv>. This dataset contains the aggregated data for demographics and academic success metrics for all 479 schools. Overall, this dataset has 30 variables which includes a database number as well as the name of each school.
+
+```{r load_dataset, echo=TRUE, warning=FALSE}
+
+df <- read_csv("combined.csv",show_col_types = FALSE)
+head(df) # display the first few rows of the dataset
+
+```
+
+The following datasets above can be loaded here: <https://data.cityofnewyork.us/Education/2011-NYC-School-Survey/mnz3-dyi8>
+
+For the next two files, masterfile11_gened_final.xlsx and masterfile11_gened_final.txt, contain survey data for "general education" schools - those that do not specifically serve populations with special needs.
+
+The files masterfile11_d75_final.xlsx and masterfile11_d75_final.txt contain survey data for District 75 schools, which provide exceptional education support for children with special needs such as learning or physical disabilities.
+
+```{r load_dataset2, echo=TRUE, warning=FALSE}
+
+# Load tab-separated files
+masterfile11_gened <- read_tsv("masterfile11_gened_final.txt", show_col_types = FALSE)
+masterfile11_d75 <- read_tsv("masterfile11_d75_final.txt", show_col_types = FALSE)
+
+```
+
+Lastly, the file Survey Data Dictionary.xls, contains metadata that will be useful as you decide how to clean and prepare the survey data for analysis.
+
+The datasets provided here contain survey data collected from all parents, all teachers, and students in grades 6 - 12 of the NYC schools. Based on the provided data dictionary, the datasets can be divided into three parts:
+
+- Demographics or the profile of the respondents
+- Overview or the general statistics of the respondents, and the
+- Responses gathered from the respondents
+
+
+```{r load_data_dictionary, echo=TRUE, warning=FALSE}
+df_dictionary <- read_excel("Survey Data Dictionary.xls", 
+                            skip = 3) # Skip first two rows of the file
+
+# Divide dictionary into three sections
+df_dictionary_def <- df_dictionary[1:32,] 
+# Contains demographical/statistical variables
+
+df_dictionary_def_cols <- df_dictionary[34:42,] 
+colnames(df_dictionary_def_cols) <- df_dictionary[33,]
+# Contains the summary statistics for all of the responses obtained
+
+df_dictionary_q_and_r <- df_dictionary[44:55,]
+colnames(df_dictionary_def_cols) <- df_dictionary[43,]
+# Contains the questions/responses of all the respondents
+
+df_dictionary_def
+
+```
+
+### Cleaning the datasets
+
+Since we'll be using the masterfiles to obtain the responses for each highschool, we'll be selecting the relevant data to be used for all highschools for both of these datasets and store them to new variables:
+
+```{r filter_hs_data, echo=TRUE, warning=FALSE}
+
+mf_gened_simp <- masterfile11_gened %>% 
+  filter(schooltype == "High School") %>% 
+  select(dbn, schoolname, schooltype, starts_with(c("saf_","com_","eng_","aca"))) 
+# Selects all relevant survey info (school info. and responses for each field of metric) for all highschools
+
+mf_d75_simp <- masterfile11_d75 %>% filter(is.na(highschool)) %>% 
+  select(dbn, schoolname, schooltype, starts_with(c("saf_","com_","eng_","aca"))) # Selects all relevant survey info (school info. and responses for each field of metric) for all highschools in District 75 Special Education
+
+```
+
+We'll then be combining the cleaned masterfiles into one survey file using the DBN key below:
+
+```{r combine_mf, echo=TRUE, warning=FALSE}
+
+combined_survey_data <- mf_gened_simp %>% 
+  bind_rows(mf_d75_simp) %>% 
+  rename(DBN = dbn, school_name = schoolname) 
+# Combines both datasets and renames DBN key to combine for later
+
+head(combined_survey_data)
+
+```
+
+After we have combined both masterfiles into a single dataset, we'll be combining this dataset with our initial dataset containing the aggregated demographics/academic success metrics.
+
+```{r combine_df_mf, echo=TRUE, warning=FALSE}
+
+joined_df <- df %>% left_join(combined_survey_data, by="DBN") # Combines the demographic data with the survey data by DBN while keeping the cols. of the demographic data
+
+joined_df$school_name.y <- NULL # Removes the duplicate school name column
+joined_df <- joined_df %>% rename(school_name = school_name.x) # Renames the remaining school name column.
+
+head(joined_df)
+
+```
+
+### Creating the correlation matrices
+
+In order to create the correlation matrices, we'll first be selecting all the relevant numerical data to compare and measure against the responses of each respondent:
+
+```{r numerical_df, echo=TRUE, warning=FALSE}
+
+corr_df <- joined_df %>% select(c(4:6,11:17,19:24)) # selects all numerical data
+colnames(corr_df) # displays the selected numerical columns
+
+```
+
+To get the overall responses for each type of respondent, we'll be getting the means for each row/school based on the identifier of each respondent.
+
+```{r aggregate_responses, echo=TRUE, warning=FALSE}
+
+corr_df <- corr_df %>% mutate(avg_teacher_resp = joined_df %>% 
+                                select(contains("_t_")) %>% rowMeans(), 
+                              # Get the means of teachers' responses for each row
+                              
+                              avg_student_resp = joined_df %>% 
+                                select(contains("_s_")) %>% rowMeans(),
+                              # Get the means of students' responses for each row
+                              
+                              avg_parent_resp = joined_df %>% 
+                                select(contains("_p_")) %>% rowMeans()
+                              # Get the means of parents' responses for each row
+                              
+                              )
+
+```
+
+Now that we have aggregated the responses, we'll now proceed with generating the correlations for all variables against the mean response of each respondents. We'll also exclude the correlation of the mean response against itself since the resulting correlation/s are not significant to the analysis.
+
+```{r corr_matrix, echo=TRUE, warning=FALSE}
+
+corr_matrix <- corr_df %>% cor(use="pairwise.complete.obs") # Get the correlation of complete observations
+corr_matrix_tib <- corr_matrix %>% as_tibble(rownames = "Variable") # Change data type to dataframe
+
+perception_score_corr <- corr_matrix_tib %>% select(Variable, ends_with("_resp")) # Include only the columns on the mean responses
+perception_score_corr <- perception_score_corr[-c(17:19),] # Exclude the mean response rows
+perception_score_corr
+
+```
+
+To better understand the coefficient values, we'll also be creating graphs to better illustrate the relationships. We'll start of first by creating a pivot table for the generation of charts:
+
+```{r pivot_corr, echo=TRUE, warning=FALSE}
+
+pivoted_corr <- corr_df %>% pivot_longer(cols=1:16, 
+                                         names_to = "metrics", 
+                                         values_to = "values") # Combines all factors into a single column.
+
+```
+
+### Do student, teacher, and parent perceptions of NYC school quality appear to be related to demographic and academic success metrics?
+
+Overall, student, teacher, and parent perceptions of NYC school quality appear to be related to demographic and academic success metrics. 
+
+Based on the plot of correlations on teacher responses, it seemed that factors such as SAT scores, and high score exams lead to better perceptions of NYC school quality while sped/male percentage in class tend to decrease the overall perception.
+
+```{r plot1, echo=TRUE, warning=FALSE}
+
+pivoted_corr %>% 
+  ggplot(aes(x=values, y=avg_teacher_resp)) + # compares the overall average response of teachers
+  geom_point(alpha=0.5, color="yellowgreen") + 
+  geom_smooth(method="lm", se=FALSE) + # add a regression line
+  facet_wrap(vars(metrics), scales="free_x") + # Makes the x-axis dynamic
+  labs(title = "Relationship bet. Overall Teacher Responses and Metrics", 
+       x="Values", 
+       y="Perception Score") + theme_bw()
+
+```
+
+We can also see a similar result for the students' responses with more evidence of a relationship between academic success metrics such as SAT scores and percentage of high scores and the overall peception in the school.
+
+Some of the demographic factors such as the percentage of blacks, speds, and males tend to lead to the students' negative perception of the schools which could either indicate the presence of discrimination in the schools or by how schools treat or handle these groups.
+
+```{r plot2, echo=TRUE, warning=FALSE}
+
+pivoted_corr %>% 
+  ggplot(aes(x=values, y=avg_student_resp)) + # compares the overall average response of students
+  geom_point(alpha=0.5, color="orangered") + 
+  geom_smooth(method="lm", se=FALSE) +
+  facet_wrap(vars(metrics), scales="free_x") +
+  labs(title = "Relationship bet. Overall Student Responses and Metrics", 
+       x="Values", 
+       y="Perception Score") + theme_bw()
+
+```
+
+Lastly, for the parents' responses, most of their positive perception of the school is dependent on the how much the schools are producing topnotchers whereas most of their negative perceptions stems from the increasing population of classes (average class size and total enrollment). 
+
+```{r plot3, echo=TRUE, warning=FALSE}
+
+pivoted_corr %>% 
+  ggplot(aes(x=values, y=avg_parent_resp)) + # compares the overall average response of parents
+  geom_point(alpha=0.5, color="midnightblue") + 
+  geom_smooth(method="lm", se=FALSE) +
+  facet_wrap(vars(metrics), scales="free_x") +
+  labs(title = "Relationship bet. Overall Parent Responses and Metrics", 
+       x="Values", 
+       y="Perception Score") + theme_bw()
+
+```
+
+### Do students, teachers, and parents have similar perceptions of NYC school quality?
+
+After we have determined the relationships for each response, we'll now check whether or not the overall responses of each respondent tend to be similar across each metric. We'll first start by creating a pivot table to use for the charting:
+
+```{r pivot_df2, echo=TRUE, warning=FALSE}
+
+pivot_responses <- joined_df %>% 
+  select(c(1:2,31:47)) %>% 
+  pivot_longer(cols=4:19, 
+               names_to = "responses", 
+               values_to = "values") # Combine all response columns into one column
+
+cleaned_pivot_responses <- separate(pivot_responses, responses, into=c("metric","response_type","question_no"), sep="_") # Creates three columns based on the response column code
+
+cleaned_pivot_responses <- cleaned_pivot_responses %>% 
+  mutate(response_type = case_when(response_type == "p"~"Parent",
+                                   response_type == "s"~"Student",
+                                   response_type == "t"~"Teacher",
+                                   TRUE~"Total"),
+         metric = case_when(metric == "aca"~"Academic Expectations",
+                            metric == "com"~"Communication",
+                            metric == "eng"~"Engagement",
+                            TRUE~"Safety and Respect")) # Renames the response types into more readable columns
+
+```
+
+Looking into the plot below, we can see that perception tend to be close to one another for parent, teacher, and student for academic expectations. Students tend to have a lower perception overall whereas parents tend to have a higher perception on the school overall. Engagement also tends to have a similar observation although there is a slight difference between parents' perception as well as students' perceptions.
+
+Communication as well as safety and respect perceptions tend to vary significantly for each respondent: parents tend to be more confident of their children for their safety in school and how the school communicates with them while students think otherwise.
+
+```{r plot4, echo=TRUE, warning=FALSE}
+
+cleaned_pivot_responses %>% 
+  ggplot(aes(x=values, fill=response_type)) + 
+  geom_density(alpha=0.8, color="grey") + # Makes the plots more transparent
+  facet_wrap(vars(metric)) + # Creates plots for each metric of response
+  labs(title="Distribution of Perception Scores per Response Type",
+       x="Score",
+       y="Density") + theme_bw()
+
+```
+
+### Conclusion
+
+The main goal of this project is to determine if indeed demographic factors and academic metrics tend to influence the perceptions of students, teachers, and parents in NYC Schools. For this project, we only considered the survey data for NYC highschools in fulfilling the research objectives.
+
+Based on the findings above, there is indeed a relationship between the demographic and academic success factors in the overall perception of the schools. While academic factors such as SAT Scores and highscores tend to have a positive effect on the perceptions, demographic factors such as the number of sped in a class or being black tend to lower the perceptions for the respondents.
+
+In terms of overall perception, parents tend to be more positive in the schools overall, particuarly when it comes to the safety and respect of their children. Students, on the other hand, tend to have lower scores for all areas, indicating a need for improvement of the schools towards their learning environment.
+<br>
+<br>
+
+
+
+
+
+
