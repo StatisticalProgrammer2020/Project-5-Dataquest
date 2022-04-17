@@ -11,8 +11,8 @@ The source of the dataset can be accessed here: https://data.world/dataquest/nyc
 This dataset contains 424 rows and 19 columns (this does not include other datasets loaded in this project).
 
 Other datasets which include survey data contain the following dimensions:
-masterfile11_d75 - 56 rows and 1773 columns
-masterfile11_gened - 1646 rows and 1942 columns
+- masterfile11_d75 - 56 rows and 1773 columns
+- masterfile11_gened - 1646 rows and 1942 columns
 
 # Summary of Variables
 
