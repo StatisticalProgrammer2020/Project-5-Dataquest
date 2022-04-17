@@ -6,7 +6,7 @@ This is my fifth project in Dataquest towards my journey in R Programming. This 
 
 # Data source
 
-The source of the dataset can be accessed here: https://data.world/dataquest/nyc-schools-data/workspace/file?filename=combined.csv
+The source of the main dataset can be accessed here: https://data.world/dataquest/nyc-schools-data/workspace/file?filename=combined.csv
 
 This dataset contains 424 rows and 19 columns (this does not include other datasets loaded in this project).
 
