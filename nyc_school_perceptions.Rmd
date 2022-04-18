@@ -1,7 +1,6 @@
 ---
 title: "Understanding NYC School Perceptions"
 author: "Abe Ceasar Perez"
-date: "March 27, 2022"
 output: html_document
 ---
 
@@ -9,7 +8,8 @@ output: html_document
 
 This project aims to understand the perception of students, teachers, and parents on the NYC Schools. We'll be working as a researcher to determine whether there is any correlation between the perceptions and demographics/academic success metrics and whether the respondents have similar perceptions on the school quality.
 
-In addition to the objectives above, we'll be applying the following concepts in this project:
+For this project, the following concepts were applied in order to accomplish the objectives above:
+
 - String Manipulation
 - Correlations
 - Data Reshaping
